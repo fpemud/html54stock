@@ -1,0 +1,153 @@
+<!doctype html />
+<html>
+<head>
+    <title>touch</title>
+    <meta http-equiv="content-type" content="text/html;charset=gbk" />
+</head>
+<body>
+    <img src="http://cn.bing.com/az/hprichbg?p=rb%2fForbiddenCity_ZH-CN276990937.jpg"
+        alt="test" ontouchstart="touchStart(event)" ontouchmove="touchMove(event)" ontouchend="touchEnd(event)" />
+    <div id="debug"></div>
+    <div id="debugSpeed"></div>
+    <script type="text/javascript">
+            function $id(id) { return document.getElementById(id); }
+            function setDebugMsg(msg, debugType) {
+                var id = 'debug' + (debugType ? debugType : '');
+                var o = $id(id);
+                if (!o) {
+                    o = document.createElement('DIV');
+                    o.id = id;
+                    document.body.appendChild(o);
+                }
+                o.innerHTML = '<p>' + msg + '</p>';
+            }
+            function getTarget(e) {
+                return e.target || e.srcElement;
+            }
+            function getTouchFingers(e){
+                var fingers = [];
+                var touchTime = new Date();
+               for(var i=0;i<e.touches.length;i++){
+                    var touch = e.touches[i];
+
+                    function touchToFinger(touch) { 
+                        return {identifier:touch.identifier,pageX:touch.pageX,pageY:touch.pageY,touchTime:touchTime};
+                    }
+                    var finger = touchToFinger(touch);
+                    fingers.push(finger);
+                }
+                //计算两个touch点之间的距离
+                for (var i = 0; i < fingers.length; i++) {
+                    var fingerI = fingers[i];
+                    if(i == fingers.length-1)break;
+                    var distances = [];
+                    for (var j = i + 1; j < fingers.length; j++) {
+                        var fingerJ = fingers[j];
+                        distances[fingerJ.identifier] = { x: fingerJ.pageX - fingerI.pageX, y: fingerJ.pageY - fingerI.pageY };
+                    }
+                    fingers[i].distances = distances;
+                }
+                return fingers;
+            }
+            function disableBubbleAndPreventDefault(e) {
+                if (e.preventDefault) e.preventDefault();
+                e.cancelBubble = true;
+            }
+            function touchStart(e) {
+                e = e || window.event;
+                //var h = 'touchStart:' + getTouchEventDesc(e);
+                //setDebugMsg(h);
+                var target = getTarget(e);
+                var fingers = getTouchFingers(e);
+                target.fingers = fingers;
+                disableBubbleAndPreventDefault(e);
+            }  
+            function touchMove(e) {
+                e = e || event;
+                //var h = 'touchMove:' + getTouchEventDesc(e);
+                //setDebugMsg(h);
+                var target = getTarget(e);
+                var fingers = getTouchFingers(e);
+                //计算各个手指的移动速度和加速度
+                var oldFingers = target.fingers;
+                var continueExec = (fingers && fingers.length && oldFingers && oldFingers.length);
+                setDebugMsg('continueExec is ' + continueExec);
+                if (!continueExec) return;
+                setDebugMsg('fingers.length is ' + fingers.length);
+                for (var i = 0; i < fingers.length; i++) {
+                    var fingerNew = fingers[i];
+                    var fingerOld = null;
+                    for (var j = 0; j < oldFingers.length; j++) {
+                        var fingerJ = oldFingers[j];
+                        if (fingerNew.identifier == fingerJ.identifier) {
+                            fingerOld = fingerJ;
+                            break;
+                        }
+                    }
+                    setDebugMsg('fingerOld is ' + fingerOld);
+                    if (fingerOld) {
+                        //计算x方向速度
+                        var timeSpan = (fingerNew.touchTime.getTime() - fingerOld.touchTime.getTime())*.001;
+                        var xNew = fingerNew.pageX;
+                        var xOld = fingerOld.pageX;
+
+                        var speed = (xNew - xOld) / timeSpan;
+                        fingerNew.speed = speed;
+                        setDebugMsg('speed is ' + speed);
+                        var speedOld = fingerOld.speed;
+                        var accelerate = 0;
+                        if (speedOld) {
+                            accelerate = (speed - speedOld) / timeSpan;
+                            fingerNew.accelerate = accelerate;
+                        }
+
+                        setDebugMsg('accelerate is ' + accelerate);
+                        fingers[i] = fingerNew;
+                        function distancesHtml(distances){
+                            var h = '';
+                            
+                            for(var att in distances){
+                                h += att + '= [x:' + distances[att].x + ',y:' + distances[att].y + '];';
+                            }
+                            return h;
+                        }
+                        setDebugMsg('finger ' + fingerOld.identifier + ' x\'speed is ' + speed + ',accelerate is ' + accelerate
+                            + ' distances ' + distancesHtml(fingerNew.distances),
+                            'Speed'+fingerOld.identifier);
+                    }
+                }
+                target.fingers = fingers;
+                disableBubbleAndPreventDefault(e);
+            }
+            function touchEnd(e) {
+                e = e || event;
+                //var h = 'touchEnd:' + getTouchEventDesc(e);
+                //setDebugMsg(h);
+                var target = getTarget(e);
+                target.fingers = null;
+                disableBubbleAndPreventDefault(e);
+            }
+            
+            function getTouchEventDesc(e) {
+                var h = 'e.touches.length=' + e.touches.length;
+                for (var k in e) {
+                    h += 'e attr ' + k + ' = ' + e[k] + '<br/>';
+                }
+                for (var i = 0; i < e.touches.length; i++) {
+                    var touch = e.touches[i];
+                    h += ('<br/>&nbsp;&nbsp;touches[' + i + ']');
+                    for (var att in touch) {
+                        h += '<br/>&nbsp;&nbsp;&nbsp;&nbsp;' + att + '=' + touch[att];
+                    }
+                }
+                return h;
+            }
+
+document.write('<div>');
+for(var i in navigator){
+document.write('<br/>navigator.'+i+'=' +navigator[i]);
+}
+document.write('</div>');
+    </script>
+</body>
+</html>

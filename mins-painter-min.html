@@ -1,0 +1,552 @@
+﻿<!doctype html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html;charset=GBK" />
+    <title>html 5 minutes chart painter</title>
+    <script src="libs/loading.js" type="text/javascript" charset="GBK"></script>
+    <script src="libs/util.js" type="text/javascript" charset="GBK"></script>
+    <script src="libs/painter.js" type="text/javascript" charset="GBK"></script>
+    <script src="libs/ajax.js" type="text/javascript" charset="GBK"></script>
+    <script src="libs/crossLines.js?a" type="text/javascript" charset="GBK"></script>
+    <script src="libs/chartEventHelper.js?a" type="text/javascript" charset="GBK"></script>
+    <script type="text/javascript">
+/*
+html5行情图库
+author:yukaizhao
+blog:http://www.cnblogs.com/yukaizhao/ http://weibo.com/yukaizhao/
+参与项目或技术交流：yukaizhao@gmail.com
+*/
+        function Tip(options) {
+            this.options = options;
+            this.canvas = options.canvas;
+            this.canvas.tip = this;
+        }
+
+        Tip.prototype = {
+            show: function (relativePoint, html) {
+                var dc = this.dataContext;
+                var painter = this.canvas.MCP;
+                if (dc) {
+                    var titleOptions = painter._getOptions('title');
+                    if (dc.isNewQuote) painter.drawTitle(titleOptions);
+                    else {
+                        var minTime;
+                        var minIndex = dc.index;
+                        if (minIndex < dc.data.length && minIndex > -1) {
+                            minPrice = dc.data[minIndex].price;
+                            minTime = dc.data[minIndex].time;
+                        } else {
+                            minPrice = this.quote.price;
+                            minTime = this.quote.time;
+                        }
+
+                        painter.drawTitle(titleOptions, minTime, minPrice);
+                    }
+                }
+            },
+            update: function (relativePoint, html) {
+                this.show(relativePoint, html);
+            },
+            hide: function () {
+                var painter = this.canvas.MCP;
+                var titleOptions = painter._getOptions('title');
+                painter.drawTitle(titleOptions);
+            }
+        };
+
+        (function () {
+            function minutesChartPainter(options) {
+                this.canvasId = options.canvasId;
+                if (!this.canvasId) {
+                    alert('必须指定canvasId');
+                    return;
+                }
+
+                this.riseColor = options.riseColor || 'red';
+                this.fallColor = options.fallColor || 'green';
+                this.normalColor = options.normalColor || 'black';
+                for (var k in options) {
+                    this[k] = options[k];
+                }
+
+                this.canvas = $id(this.canvasId);
+                this.canUseCanvas = this.canvas.getContext;
+                if (this.canUseCanvas) {
+                    this.ctx = this.canvas.getContext('2d');
+                    this.ctxs = {};
+                    this.ctxs[options.canvasId] = this.ctx;
+                    this.width = this.canvas.width;
+                    this.height = this.canvas.height;
+                    this.coords = getPageCoord(this.canvas);
+                    this.maxZIndex = this.canvas.style.zIndex || 1;
+                }
+                extendObject(options, this);
+                extendObject(window._painter, this);
+            }
+
+            var MCP = window.MCP = minutesChartPainter;
+
+            MCP.prototype.loadData = function (completeCallback) {
+                if (this.debug && this.useFakeData) {
+                    this.quotes = getQuote();
+                    this.quote = this.quotes.quote;
+                    this.mins = this.quotes.mins;
+                    completeCallback();
+                    return;
+                }
+
+                var painter = this;
+                if (!painter.isFirstLoaded)
+                    painter.isFirstLoaded = true;
+
+                var dataUrl = this.dataUrl + (this.dataUrl.indexOf('?') > 0 ? '&' : '?') + 'random='+ (new Date()).getTime();
+                Ajax.get(dataUrl, function (ajax) {
+                    function getNodeValue(parent, childName, i) {
+                        return eval(parent.getElementsByTagName(childName)[i || 0].textContent);
+                    }
+                    var dom = ajax.responseXML;
+                    var rootNode = dom.getElementsByTagName('HexunQuote')[0];
+                    var miniFlashNode = rootNode.getElementsByTagName('MiniFlash')[0];
+                    var commodityNode = miniFlashNode.getElementsByTagName('Commodity')[0];
+                    var quoteNode = commodityNode.getElementsByTagName('Quote')[0];
+                    var quoteNodeItem = quoteNode.getElementsByTagName('Item')[0];
+
+                    var quote = {
+                        time: getNodeValue(quoteNodeItem, 'TM', 0),
+                        open: getNodeValue(quoteNodeItem, 'OP', 0),
+                        preClose: getNodeValue(quoteNodeItem, 'PC', 0),
+                        highest: getNodeValue(quoteNodeItem, 'HI', 0),
+                        lowest: getNodeValue(quoteNodeItem, 'LO', 0),
+                        price: getNodeValue(quoteNodeItem, 'PR', 0),
+                        volume: getNodeValue(quoteNodeItem, 'VO', 0),
+                        amount: getNodeValue(quoteNodeItem, 'AM', 0)
+                    };
+                    //如果时间相同那就不重新画了
+                    if (painter.quote && quote.time == painter.quote.time && quote.price == painter.quote.price) {
+                        return;
+                    }
+                    var mins = new Array();
+
+                    var minNodes = dom.firstChild.firstChild.firstChild.firstChild.nextSibling.getElementsByTagName('Item');
+                    for (var i = 0; i < minNodes.length; i++) {
+                        var minNode = minNodes[i];
+                        var min = {
+                            price: getNodeValue(minNode, 'PR', 0),
+                            volume: getNodeValue(minNode, 'VO', 0),
+                            amount: getNodeValue(minNode, 'AM', 0)
+                        };
+                        mins.push(min);
+                    }
+
+                    painter.quotes = { quote: quote, mins: mins };
+                    painter.quote = quote;
+                    painter.mins = mins;
+                    completeCallback();
+                    painter.isFirstLoaded = false;
+                }, this.canvasId, (painter.isFirstLoaded === true));
+            };
+
+            MCP.prototype.drawTitle = function (options, quoteTime, price) {
+                options.height = options.height || this.height;
+                options.width = options.width || this.width;
+
+                options.id = this.canvasId + '_title';
+                options.debug_backgroundColor = '#f0f0f0';
+
+                var offsetY = options.offsetY || 0;
+                var offsetX = options.offsetX || 0;
+
+                var preClose = preClose || this.quote.preClose;
+                price = price || this.quote.price;
+                var time = quoteTime || this.quote.time;
+
+                var ctx = this._createLayer(options, true);
+                var fontColor = options.fontColor || 'Black';
+                ctx.textAlign = options.textAlign || 'left';
+                var txtNewest = '最新' + price;
+                ctx.font = options.font || '9pt 宋体';
+                ctx.fillStyle = fontColor;
+                var titleWidth = this._measureText(ctx, txtNewest);
+                var paddingBottom = options.paddingBottom || 2;
+                var titleY = options.height - paddingBottom;
+                ctx.fillText(txtNewest, offsetX, titleY);
+                var isRise = price > preClose;
+                var isEqual = price == preClose;
+                var isFall = price < preClose;
+                var diff = toMoney(price - preClose);
+                var txtRiseFall = (isRise ? '↑' : (isFall ? '↓' : '')) + diff
+            + ('(')
+            + toMoney(diff * 100 / preClose)
+            + '%)';
+                ctx.fillStyle = isRise ? this.riseColor : (isFall ? this.fallColor : this.normalColor);
+                var riseFallWidth = this._measureText(ctx, txtRiseFall);
+                ctx.fillText(txtRiseFall, offsetX + titleWidth + 2, titleY);
+
+                var temp = new String(time);
+                var txtTime = temp.charAt(8) + temp.charAt(9) + ':' + temp.charAt(10) + temp.charAt(11);
+                ctx.fillStyle = fontColor;
+                var timeWidth = this._measureText(ctx, txtTime);
+                var timePaddingRight = options.timePaddingRight || 4;
+                ctx.fillText(txtTime, options.width - timeWidth - timePaddingRight, titleY);
+            };
+
+            MCP.prototype._getRiseFallColor = function (price) {
+                var preClose = this.quote.preClose;
+                var isRise = price > preClose;
+                var isEqual = price == preClose;
+                var isFall = price < preClose;
+                return isRise ? this.riseColor : (isFall ? this.fallColor : this.normalColor);
+            };
+
+            MCP.prototype.drawContent = function (options) {
+                options.id = this.canvasId + '_content';
+                options.offsetX = options.offsetX || 0;
+                options.offsetY = options.offsetY || 0;
+                options.debug_backgroundColor = 'white';
+
+                var ctx = this._createLayer(options, true);
+                //画矩形框
+                this._drawRect(ctx, 0, 0, options.width, options.height, options.backgroundColor, 1, options.borderColor, options.offsetX, options.offsetY);
+                //画底纹
+                //平行中线，平行上线，平行下线
+                var middleY = options.height / 2;
+                this._drawLine(ctx, 0, middleY, options.width, middleY, options.middleBorderColor, 1, options.offsetX, options.offsetY);
+                var lineY = options.height / 4;
+                this._drawLine(ctx, 0, lineY, options.width, lineY, options.backgroundBorderColor, 1, options.offsetX, options.offsetY);
+                lineY = options.height * 3 / 4;
+                this._drawLine(ctx, 0, lineY, options.width, lineY, options.backgroundBorderColor, 1, options.offsetX, options.offsetY);
+
+                //垂直三条线,要根据noonAtTimelinePosition属性设置
+                var position = this.noonAtTimelinePosition || .5;
+                var noonX = options.width * position;
+                this._drawLine(ctx, noonX, 0, noonX, options.height, options.backgroundBorderColor, 1, options.offsetX, options.offsetY);
+                noonX = noonX / 2;
+                this._drawLine(ctx, noonX, 0, noonX, options.height, options.backgroundBorderColor, 1, options.offsetX, options.offsetY);
+                noonX = options.width * (position + (1 - position) / 2);
+                this._drawLine(ctx, noonX, 0, noonX, options.height, options.backgroundBorderColor, 1, options.offsetX, options.offsetY);
+
+                //点击查看大图
+                this._drawText(ctx, '点击查看大图', options.offsetX + options.width / 2, options.offsetY + options.height / 2 - 4, '9pt 宋体', '#666666', 'center');
+
+                var quote = this.quote;
+                var mins = this.mins;
+                var priceDiffMax = Math.max(Math.abs(quote.preClose - quote.highest), Math.abs(quote.preClose - quote.lowest));
+                var pricePerPx = (options.height / 2) / priceDiffMax;
+                this.pricePerPx = pricePerPx;
+
+                var getPriceYPx = function (val) {
+                    var diff = val - quote.preClose;
+                    return middleY - diff * pricePerPx;
+                };
+                var getTimeXPx = function (minIndex, minsCount) {
+                    return options.offsetX + options.width * minIndex / minsCount;
+                };
+                var getMinTime = this.getTimeByIndex;
+                //开始画价格线
+                ctx.beginPath();
+                for (var i = 0; i < mins.length; i++) {
+                    var priceY = getPriceYPx(this.mins[i].price);
+                    var priceX = getTimeXPx(i, this.minsCount);
+                    if (i == 0) ctx.moveTo(priceX, priceY);
+                    else ctx.lineTo(priceX, priceY);
+                    this.mins[i].y = priceY;
+                    this.mins[i].x = priceX;
+                    this.mins[i].time = 'yyyyMMdd' + getMinTime(i);
+                }
+                ctx.strokeStyle = options.priceLineColor;
+                ctx.lineWidth = options.priceLineWidth;
+                ctx.stroke();
+                //价格线结束      
+
+                //绑定mouse events
+                var canvas = this.layers[options.id];
+                if (canvas.hasAddEvents) return;
+                canvas.style.cursor = 'pointer';
+                canvas.MCP = this;
+                var me = this;
+
+                function getY(x) {
+                    var index = Math.ceil((x - options.offsetX) * me.minsCount / options.width);
+                    var val;
+                    var isNewQuote;
+                    if (index >= 0 && index < mins.length) {
+                        val = mins[index].price;
+                        isNewQuote = false;
+                    } else {
+                        val = quote.price;
+                        isNewQuote = true;
+                    }
+
+                    if (canvas.tip) canvas.tip.dataContext = { data: mins, isNewQuote: isNewQuote, index: index };
+                    var diff = val - quote.preClose;
+                    var middleY = (options.offsetY + options.height / 2);
+                    return middleY - diff * options.height / 2 / priceDiffMax;
+                }
+
+                function getX(x){
+                    var index = Math.ceil((x - options.offsetX) * me.minsCount / options.width);
+                    var val;
+                    if (index < 0) index =0;
+                    if(index >= mins.length)  index = mins.length-1;
+                    return getTimeXPx(index,me.minsCount);
+                }
+
+                //添加鼠标事件
+                addCrossLinesAndTipEvents(canvas, {
+                    getCrossPoint: function (ev) { return { x:getX(ev.offsetX), y: getY(ev.offsetX) }; },
+                    triggerEventRanges: { x: options.offsetX, y: options.offsetY, width: options.width, height: options.height },
+                    tipOptions: {
+                        getTipHtml: function (ev) { return null; },
+                        position: { x: false, y: false }
+                    },
+                    crossLineOptions: {
+                        color: 'black'
+                    },
+                    onClick:options.onClick
+                });
+            };
+
+            //画时间轴
+            MCP.prototype.drawTimeAxis = function (options) {
+                var font = options.font || '9pt Arial';
+                var color = options.color || 'black';
+                var timeOpen = this.timeOpen;
+                var timeNoon = this.timeNoon;
+                var timeClose = this.timeClose;
+
+                options.id = this.canvasId + '_timeAxis';
+                options.offsetX = options.offsetX || 0;
+                options.offsetY = options.offsetY || 0;
+                options.debug_backgroundColor = 'yellow';
+                var ctx = this._createLayer(options, true);
+
+                ctx.font = font;
+                var fontWidth = this._measureText(ctx, timeOpen);
+
+                var fontY = options.fontY || options.height; // +fontWidth;
+                this._drawText(ctx, timeOpen, options.offsetX, fontY, font, color);
+
+
+                var fontNoonWidth = this._measureText(ctx, timeNoon);
+                var fontCloseWidth = this._measureText(ctx, timeClose);
+
+                var padding = options.timeCloseRightPadding || 2;
+                var xNoon = options.offsetX + options.width * (this.noonAtTimelinePosition || .5) - fontNoonWidth / 2;
+                var xClose = options.offsetX + options.width - fontCloseWidth - padding;
+                if (xNoon + fontNoonWidth > xClose) xNoon = xClose - fontNoonWidth - padding;
+                this._drawText(ctx, timeNoon, xNoon, fontY, font, color);
+                this._drawText(ctx, timeClose, xClose, fontY, font, color);
+            };
+
+            MCP.prototype.drawFoot = function (options) {
+                var font = options.font || '9pt Arial';
+                var color = options.color || 'black';
+                options.id = this.canvasId + '_foot';
+                options.offsetX = options.offsetX || 0;
+                options.offsetY = options.offsetY || 0;
+                options.debug_backgroundColor = '#ffffff';
+                var ctx = this._createLayer(options, true);
+
+                //高9999 低9999 成交888999
+                var txt = '高';
+                var paddingLeft = options.paddingLeft || 2;
+                var w = paddingLeft + this._measureText(ctx, txt, font);
+                var y = options.height - (options.paddingTop || 2);
+                this._drawText(ctx, txt, paddingLeft, y, font, color);
+                var highColor = this._getRiseFallColor(this.quote.highest);
+                var high = this.quote.highest.toFixed(2);
+                this._drawText(ctx, high, w, y, font, highColor);
+                w += this._measureText(ctx, high, font);
+                txt = ' 低';
+                this._drawText(ctx, txt, w, y, font, color);
+                w += this._measureText(ctx, txt, font);
+                var lowColor = this._getRiseFallColor(this.quote.lowest);
+                var low = this.quote.lowest.toFixed(2);
+                this._drawText(ctx, low, w, y, font, lowColor);
+                w += this._measureText(ctx, low, font);
+                var amount;
+                if(this.showTradeType == 'volume'){
+                    if(this.quote.volume){
+                        amount = ' 成交' +  bigNumberToText(this.quote.volume) + '手';
+                    }
+                }else{
+                    if (this.quote.amount) {
+                        amount = ' 成交' + bigNumberToText(this.quote.amount);
+                    }
+                }
+                if(amount)this._drawText(ctx, amount, w, y, font, color);
+            };
+
+            MCP.prototype.drawPriceAxis = function (options) { };
+
+            MCP.prototype.paint = function () {
+                if (!this.canUseCanvas) return;
+                var mcp = this;
+                var loadDataCallback = function () {
+                    if (mcp.titleOptions) mcp.drawTitle(mcp.titleOptions);
+                    mcp.drawContent(mcp.contentOptions);
+                    if (mcp.priceAxisOptions) mcp.drawPriceAxis(mcp.priceAxisOptions);
+                    if (mcp.timeAxisOptions) mcp.drawTimeAxis(mcp.timeAxisOptions);
+                    if (mcp.footOptions) mcp.drawFoot(mcp.footOptions);
+                    if (mcp.customPainter && typeof (mcp.customPainter.method) == 'function') {
+                        mcp.customPainter.method(mcp.customPainter.options, mcp);
+                    }
+                };
+                mcp.loadData(loadDataCallback);
+                window.mcp.intervalHandler = window.setInterval(function () {
+                    mcp.loadData(loadDataCallback);
+                }, window.mcp.interval);
+
+            };
+
+            MCP.prototype.updateDataUrl = function (dataUrl) {
+                this.dataUrl = dataUrl;
+                window.clearInterval(this.intervalHandler);
+                this.isFirstLoaded = false;
+                this.paint();
+            };
+        })();
+
+    </script>
+<!---->
+     <script>
+        addLoadEvent(function () {
+            var mcp = new MCP({
+                timeOpen: '09:30', timeNoon: '11:30/13:00', timeClose: '15:00', showTradeType:'amount',
+                noonAtTimelinePosition:.5,
+                getTimeByIndex: function (minIndex) {
+                    //上午09：30-11：30
+                    //下午13：00-15：00
+                    var d = new Date();
+                    if (minIndex <= 120) {
+                        d.setHours(9, 30, 30);
+                        d = new Date(d.getTime() + (minIndex) * 60 * 1000);
+                    } else {
+                        d.setHours(13, 0, 0);
+                        d = new Date(d.getTime() + (minIndex - 120) * 60 * 1000);
+                    }
+
+                    var hour = d.getHours() > 9 ? new String(d.getHours()) : '0' + d.getHours();
+                    var minutes = d.getMinutes() > 9 ? new String(d.getMinutes()) : '0' + d.getMinutes();
+                    var seconds = '30';
+                    return hour + minutes + seconds;
+                },
+                canvasId: 'canvasMCP',
+                interval: 10000,
+                minsCount: 241,
+                dataUrl: 'QTMI_1_000001.xml',
+                titleOptions: { left: 4, top: 0, height: 20, width: 0, paddingBottom: 4, timePaddingRight: 4 },
+                contentOptions: {
+                    left: 2,
+                    top: 20,
+                    height: 85,
+                    width: 155,
+                    borderColor: '#444444',
+                    priceLineColor: '#2358A6',
+                    priceLineWidth: 1,
+                    middleBorderColor: '#ff0000',
+                    backgroundBorderColor: '#d6d6d6',
+                    backgroundColor: '#ffffff',
+                    onClick: function () { window.open('http://stockdata.stock.hexun.com/indexhq_000001_1.shtml'); }
+                },
+                timeAxisOptions: {
+                    left: 2,
+                    top: 105,
+                    width: 155,
+                    height: 18,
+                    font: '9pt Arial',
+                    fontY: 14,
+                    timeOpen: '09:30',
+                    timeNoon: '11:30/13:00',
+                    timeClose: '15:00',
+                    timeCloseRightPadding: 2
+                },
+                footOptions: {
+                    left: 2,
+                    top: 123,
+                    height: 18,
+                    width: 0,
+                    paddingTop: 4,
+                    paddingLeft: 0,
+                    font: '9pt 宋体',
+                    color: 'black'
+                },
+                customPainter: {
+                    method: function (options, painter) {
+                        var id = painter.canvasId + '_menu';
+                        var div = $id(id);
+                        var exits = (div != null);
+                        if (!exits) {
+                            div = document.createElement('DIV');
+                            div.id = id;
+                            div.className = 'menu';
+                            var sections = options.sections;
+                            for (var i = 0; i < sections.length; i++) {
+                                var sec = sections[i];
+                                var a = document.createElement('A');
+                                a.innerHTML = sec.text;
+                                a.href = sec.url;
+                                a.className = sec.cssClass;
+                                a.target = sec.target || '_blank';
+                                div.appendChild(a);
+                            }
+                        }
+                        div.style.display = 'block';
+                        div.style.position = 'absolute';
+                        div.style.width = options.width + 'px';
+                        div.style.height = options.height + 'px';
+                        div.style.left = options.left + painter.coords.x + 'px';
+                        div.style.top = options.top + painter.coords.y + 'px';
+                        if (!exits) document.body.appendChild(div);
+                    },
+                    options: {
+                        left: 158,
+                        top: 18,
+                        width: 214 - 158,
+                        height: 146 - 20 - 18,
+                        sections: [
+                            { text: '行情中心', url: 'http://quote.hexun.com/', cssClass: 'menuItem' },
+                            { text: '资金流向', url: 'http://quote.hexun.com/', cssClass: 'menuItem' },
+                            { text: '微博解盘', url: 'http://quote.hexun.com/', cssClass: 'menuItem' },
+                            { text: '操盘软件', url: 'http://quote.hexun.com/', cssClass: 'menuItem focus' }
+                            ]
+                    }
+                },
+                debug: false, useFakeData: false
+            });
+            window.mcp = mcp;
+            window.mcp.paint();
+        });
+    </script>
+    <style type="text/css">
+        .menu{display:none}
+        .menuItem{border: 1px solid #666;color: #666;display: block;font-size: 9pt;font-family: Arial,宋体;margin: 2px;text-decoration: none;line-height: 16px;text-align: center;}
+        .focus{background: #FFCC66;}
+    </style>
+    <script type="text/javascript" src="mins-data.js"></script>
+</head>
+<body>
+    <div>
+        <canvas id="canvasMCP" width="214" height="146" style="z-index: 3;">
+            <p>
+                你的浏览器不支持html5哟</p>
+        </canvas>
+        <div id="canvasMCP_menu" class="menu">
+            <a href="http://quote.hexun.com/" target="_blank" class="menuItem">行情中心</a>
+            <a href="http://quote.hexun.com/" target="_blank" class="menuItem">资金流向</a>
+            <a href="http://quote.hexun.com/" target="_blank" class="menuItem">价格预测</a>
+            <a href="http://quote.hexun.com/" target="_blank" class="menuItem">微博解盘</a>
+            <a href="http://quote.hexun.com/" target="_blank" class="menuItem">操盘软件</a>
+        </div>
+    </div>
+
+    <style>
+    pre{padding: 60px 0 0 30px;color: gray;font-size: .8em;line-height: 20px;}
+    </style>
+    <p><a href="./index.html">返回列表页</a></p>
+    <pre>
+Author:yukaizhao http://www.cnblogs.com/yukaizhao/ http://weibo.com/yukaizhao/
+参与项目或技术交流：<a href="mailto:yukaizhao@gmail.com">yukaizhao@gmail.com</a>
+    </pre>
+</body>
+</html>

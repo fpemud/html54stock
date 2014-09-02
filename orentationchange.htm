@@ -1,0 +1,84 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=GBK" />
+    <title>How to build an iPhone website</title>
+    <meta name="author" content="will" />
+    <meta name="copyright" content="copyright 2008 www.engageinteractive.co.uk" />
+    <meta name="description" content="Welcome to engege interactive on the iPhone!" />
+    <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0;">
+    <link rel="apple-touch-icon" href="images/template/engage.png"/>
+    <style type="text/css">
+        @import url("iphone.css");
+    </style>
+    <script type="text/javascript">
+
+function updateOrientation(){
+    try  {
+        var contentType = "show_normal";
+        switch(window.orientation){
+                case 0:
+                contentType = "show_normal";
+                break;
+
+                case -90:
+                contentType = "show_right";
+                break;
+
+                case 90:
+                contentType = "show_left";
+                break;
+
+                case 180:
+                contentType = "show_flipped";
+                break;
+        }
+
+        document.getElementById("page_wrapper").setAttribute("class", contentType);
+        //alert('ORIENTATION: ' + contentType);
+    }
+    catch(e) {
+        alert('ERROR:' + e.message);
+    }
+} 
+
+window.onload = function initialLoad(){
+    try {
+        loaded();
+        updateOrientation();
+    }
+    catch(e) {
+        alert('ERROR:' + e.message);
+    }
+}
+
+        function loaded() {
+                document.getElementById("page_wrapper").style.visibility = "visible";
+
+        }
+
+
+    </script>
+
+</head>
+
+<body onorientationchange="updateOrientation();">
+
+    <div id="page_wrapper">
+        <h1>Engage Interactive</h1>
+        <div id="content_left">
+                <p>You are now holding your phone to the left</p>
+        </div>
+        <div id="content_right">
+                <p>You are now holding your phone to the right</p>
+        </div>
+        <div id="content_normal">
+                <p>You are now holding your phone upright</p>
+        </div>
+        <div id="content_flipped">
+                <p>This doesn't work yet, but there is a chance apple will enable it at some point, so I've put it in anyway. You would be holding your phone upside down if it did work.</p>
+        </div>
+    </div>
+
+</body>
+</html>

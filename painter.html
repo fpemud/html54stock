@@ -1,0 +1,175 @@
+<!doctype html >
+<html>
+    <head>
+        <meta http-equiv="content-type" content="text/html;charset=GBK" />
+        <title>抽象画笔</title>
+    </head>
+
+    <body>
+        <canvas id="canvas" width="400" height="300" style="border:1px solid #69c">
+        Hey，你Out了，你的浏览器不支持Html5
+        </canvas>
+        <script src="mins-data.js" type="text/javascript"></script>
+        <script src="libs/absPainter.js" type="text/javascript"></script>
+        <script type="text/javascript">
+            var painterRects = new Painter('canvas',
+                {
+                    paintItem: function (i) {
+                        var rectInfo = this.data[i];
+                        var me = this;
+                        function getValue(mayBef) { if (typeof mayBef == 'function') return mayBef.call(me); return mayBef; }
+                        var ctx = this.ctx;
+                        ctx.beginPath();
+                        if (rectInfo.backgroundColor) ctx.fillStyle = rectInfo.backgroundColor;
+                        if (rectInfo.borderColor) ctx.strokeStyle = rectInfo.borderColor;
+                        ctx.lineWidth = rectInfo.lineWidth || 1;
+                        ctx.rect(getValue(rectInfo.x), getValue(rectInfo.y), getValue(rectInfo.width), getValue(rectInfo.height));
+                        if (rectInfo.backgroundColor) ctx.fill();
+                        if (rectInfo.borderColor) ctx.stroke();
+                    }
+                },
+                [
+            /*顶部显示及时价格*/{x: 0, y: 0, width: function () { return this.width; }, height: 20, backgroundColor: 'lightgray', borderWidth: 1 },
+            /*左侧坐标轴*/{x: 0, y: 20, width: 50, height: function () { return this.height - 100; }, backgroundColor: 'yellow', borderWidth: 1 },
+                /*分时图区域*/{x: 52, y: 20, width: function () { return this.width - 104; }, height: function () { return this.height - 100; }, backgroundColor: 'gray', borderWidth: 1 },
+                /*百分比刻度区*/{x: function () { return this.width - 50; }, y: 20, width: 50, height: function () { return this.height - 100; }, backgroundColor: '#69c', borderWidth: 1 },
+            /*时间轴区*/{x: 52, y: function () { return this.height - 80; }, width: function () { return this.width - 104; }, height: 20, backgroundColor: '#69c', borderWidth: 1 },
+                /*量线区域*/{x: 52, y: function () { return this.height - 60; }, width: function () { return this.width - 104; }, height: 60, backgroundColor: 'lightgray' }
+                ]);
+                painterRects.paint();
+
+            /*
+            var painter = new Painter('canvas', {
+                start: function () {
+                    var ctx = this.ctx;
+                    ctx.save();
+                    ctx.translate(50, (ctx.canvas.height - 56) / 2);
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = 'lightgray';
+                    //矩形框
+                    ctx.beginPath();
+                    var width = 300;
+                    var height = 200;
+                    ctx.rect(0, -height / 2, width, height);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    //水平线
+                    this.drawHLine('red', 0, 0, width, 1);
+                    this.drawHLine('lightgray', 0, height / 4, width, 1);
+                    this.drawHLine('lightgray', 0, 0 - height / 4, width, 1);
+                    this.drawHLine('lightgray', 0, height / 8, width, 1);
+                    this.drawHLine('lightgray', 0, height / 8 * 3, width, 1);
+                    this.drawHLine('lightgray', 0, 0 - height / 8, width, 1);
+                    this.drawHLine('lightgray', 0, 0 - height / 8 * 3, width, 1);
+
+                    //竖直线
+                    var y = 0 - height / 2;
+                    this.drawVLine('lightgray', width / 2, y, height, 1);
+                    this.drawVLine('lightgray', width / 4, y, height, 1);
+                    this.drawVLine('lightgray', width * 3 / 4, y, height, 1);
+
+                    this.chartWidth = width;
+                    this.chartHeight = height;
+
+                    //设置价格曲线的颜色
+                    ctx.strokeStyle = 'blue';
+                    ctx.beginPath();
+                },
+                end: function () {
+                    var ctx = this.ctx;
+                    ctx.stroke();
+
+                    //恢复默认坐标系
+                    ctx.restore();
+
+                    //横轴
+                    ctx.save();
+                    ctx.translate(50, 210);
+                    ctx.fillStyle = 'black';
+                    ctx.textBaseline = 'top';
+                    ctx.textAlign = 'left';
+                    ctx.font = '11px Arial';
+                    var top = 18;
+                    ctx.fillText('09:30', 0, top);
+                    function drawText(t, x) {
+                        var w = ctx.measureText(t).width;
+                        ctx.fillText(t, x - w / 2, top);
+                    }
+                    drawText('11:30/13:00', this.chartWidth / 2);
+                    drawText('10:30', this.chartWidth / 4);
+                    drawText('14:30', this.chartWidth * 3 / 4);
+                    var text = '15:00';
+                    w = ctx.measureText(text).width;
+                    ctx.fillText(text, (this.chartWidth - w), top);
+
+                    //纵轴
+                    //获得纵轴文本
+                    //var scalerYs = [];
+                    //恢复默认坐标系
+                    ctx.restore();
+                    //将默认设置放到栈上
+                    ctx.save();
+                    ctx.translate(0, 220);
+                    var scalerWidth = 46;
+                    var maxOffset = this.maxPriceOffset;
+                    var quote = this.data.quote;
+                    //最低价
+                    var min = quote.preClose - maxOffset;
+                    ctx.fillStyle = 'green';
+                    var minTxt = min.toFixed(2);
+                    w = ctx.measureText(minTxt).width;
+                    ctx.fillText(minTxt, scalerWidth - w, 3);
+                    var percent = ((min - quote.preClose) * 100 / quote.preClose).toFixed(2) + '%';
+                    ctx.fillText(percent, scalerWidth + this.chartWidth + 10, 3);
+
+                    //最高价
+                    var max = quote.preClose + maxOffset;
+                    ctx.fillStyle = 'red';
+                    var maxTxt = max.toFixed(2);
+                    w = ctx.measureText(maxTxt).width;
+                    ctx.fillText(maxTxt, scalerWidth - w, -190);
+                    var percent = ((max-quote.preClose) * 100 / quote.preClose).toFixed(2) + '%';
+                    ctx.fillText(percent, scalerWidth + this.chartWidth + 10, -190);
+                },
+                paintItem: function (i,x, y) {
+                    if (i == 0) this.ctx.moveTo(x, y);
+                    else this.ctx.lineTo(x, y);
+                },
+                getX: function (i) {
+                    return (i) * this.chartWidth / this.data.mins.length;
+                },
+                getY: function (i) {
+                    var quote = this.data.quote;
+
+                    var pxPerYUnit = this.pxPerYUnit;
+                    if (!pxPerYUnit) {
+                        var max = Math.max(Math.abs(quote.highest - quote.preClose), Math.abs(quote.lowest - quote.preClose));
+                        pxPerYUnit = (this.chartHeight / 2) / max;
+                        this.pxPerYUnit = pxPerYUnit;
+                        this.maxPriceOffset = max;
+                    }
+
+                    var mins = this.data.mins;
+                    var price = mins[i].price;
+                    var y;
+                    //y为负值,在中轴线上方
+                    if (price > quote.preClose) {
+                        var diff = price - quote.preClose;
+                        y = 0 - pxPerYUnit * diff;
+                    } else {
+                        var diff = quote.preClose - price;
+                        y = pxPerYUnit * diff;
+                    }
+                    return y;
+                },
+                getDataLength: function () {
+                    return this.data.mins.length;
+                }
+            }, getQuote());
+
+            painter.paint();
+            */
+        </script>
+    </body>
+</html>

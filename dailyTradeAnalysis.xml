@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Data>
+<Title name='招商银行(600036)日成交分析'/>
+<Item>
+<Title name='日成交分析' unit='万元'/>
+<Item price1='11.95' price2='11.96' inflow='354.23' outflow='18.64' rate='0.80'/>
+<Item price1='11.94' price2='11.95' inflow='0.72' outflow='624.90' rate='1.61'/>
+<Item price1='11.93' price2='11.94' inflow='236.42' outflow='1000.02' rate='2.65'/>
+<Item price1='11.92' price2='11.93' inflow='1845.42' outflow='1415.71' rate='6.96'/>
+<Item price1='11.91' price2='11.92' inflow='789.38' outflow='404.75' rate='2.55'/>
+<Item price1='11.90' price2='11.91' inflow='2557.87' outflow='1088.05' rate='7.78'/>
+<Item price1='11.89' price2='11.90' inflow='909.82' outflow='361.64' rate='2.71'/>
+<Item price1='11.88' price2='11.89' inflow='6.30' outflow='30.67' rate='0.08'/>
+<Item price1='11.87' price2='11.88' inflow='784.21' outflow='120.12' rate='1.93'/>
+<Item price1='11.86' price2='11.87' inflow='371.93' outflow='491.34' rate='1.86'/>
+<Item price1='11.85' price2='11.86' inflow='1477.52' outflow='368.10' rate='4.00'/>
+<Item price1='11.84' price2='11.85' inflow='766.23' outflow='526.12' rate='2.79'/>
+<Item price1='11.83' price2='11.84' inflow='148.70' outflow='1123.89' rate='2.72'/>
+<Item price1='11.82' price2='11.83' inflow='767.31' outflow='236.95' rate='2.14'/>
+<Item price1='11.81' price2='11.82' inflow='1553.02' outflow='307.76' rate='4.03'/>
+<Item price1='11.80' price2='11.81' inflow='2745.40' outflow='1313.75' rate='8.74'/>
+<Item price1='11.79' price2='11.80' inflow='1934.56' outflow='1871.49' rate='8.15'/>
+<Item price1='11.78' price2='11.79' inflow='2335.87' outflow='1519.67' rate='8.49'/>
+<Item price1='11.77' price2='11.78' inflow='1153.60' outflow='1408.80' rate='5.52'/>
+<Item price1='11.76' price2='11.77' inflow='1.41' outflow='1221.96' rate='2.65'/>
+<Item price1='11.75' price2='11.76' inflow='49.31' outflow='328.07' rate='1.40'/>
+<Item price1='11.74' price2='11.75' inflow='99.36' outflow='28.20' rate='0.27'/>
+<Item price1='11.73' price2='11.74' inflow='20.23' outflow='112.88' rate='0.28'/>
+<Item price1='11.72' price2='11.73' inflow='0.00' outflow='0.00' rate='0.00'/>
+<Item price1='11.71' price2='11.72' inflow='7.02' outflow='1.05' rate='0.02'/>
+<Item price1='11.70' price2='11.71' inflow='535.58' outflow='624.47' rate='2.48'/>
+<Item price1='11.69' price2='11.70' inflow='368.00' outflow='355.68' rate='1.56'/>
+<Item price1='11.68' price2='11.69' inflow='224.52' outflow='211.81' rate='0.93'/>
+<Item price1='11.67' price2='11.68' inflow='135.84' outflow='440.80' rate='1.27'/>
+<Item price1='11.66' price2='11.67' inflow='17.49' outflow='382.02' rate='0.85'/>
+<Item price1='11.65' price2='11.66' inflow='142.46' outflow='265.70' rate='0.87'/>
+<Item price1='11.64' price2='11.65' inflow='452.78' outflow='125.56' rate='1.23'/>
+<Item price1='11.63' price2='11.64' inflow='100.63' outflow='410.47' rate='1.09'/>
+<Item price1='11.62' price2='11.63' inflow='190.21' outflow='106.05' rate='0.63'/>
+<Item price1='11.61' price2='11.62' inflow='342.75' outflow='455.91' rate='1.71'/>
+<Item price1='11.60' price2='11.61' inflow='488.51' outflow='322.07' rate='1.78'/>
+<Item price1='11.59' price2='11.60' inflow='628.44' outflow='473.57' rate='2.50'/>
+<Item price1='11.58' price2='11.59' inflow='9.84' outflow='736.43' rate='1.59'/>
+<Item price1='11.57' price2='11.58' inflow='0.00' outflow='26.68' rate='0.06'/>
+</Item>
+</Data>

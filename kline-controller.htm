@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html;charset=GBK"/>
+    <title>K线控制器</title>
+    <script src="libs/util.js"></script>
+    <script type="text/javascript" src="libs/controller.js"></script>
+  </head>
+  <body>
+  <canvas id="canvas" width="600" height="500" style=""></canvas>  
+  <div id="debug"></div>
+
+  <script type="text/javascript">
+      var c = new controller('canvas', {
+          region: { x: 0.5, height: 60, y: 400.5, width: 599, borderColor: 'black' },
+          bar: { width: 20, height: 35, borderColor: 'black', fillColor: 'lightgray' },
+          value: { left: 90, right: 100 },
+          minBarDistance: 20,
+          onPositionChanged: function (changeToValue) {
+              setDebugMsg('left = ' + changeToValue.left + ',right = ' + changeToValue.right);
+          },
+          touchFaultTolerance:20
+      });
+
+      c.drawControllerPart();
+      c.addControllerEvents();
+  </script>
+  </body>
+</html>

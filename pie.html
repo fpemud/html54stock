@@ -1,0 +1,321 @@
+<!doctype html>
+<html>
+  <head>
+    <title>扇形图</title>
+    <meta http-equiv="content-type" content="text/html;charset=GBK"/>
+    <script src="libs/util.js"></script>
+    <script src="libs/painter.js"></script>
+    <script type="text/javascript">
+    function getSectorData(){
+      return [
+        {name:'中国',value:10},//,color:'red'},
+        {name:'美国',value:30},//,color:'green'},
+        {name:'英国',value:15},//,color:'yellow'},
+        {name:'德国',value:15},//,color:'black'},
+        {name:'法国',value:10},//,color:'snow'},
+        {name:'日本',value:5},//,color:'white'}
+      ];
+    }
+    
+    function pie(canvasId){
+      this.canvasId = canvasId;
+      this.canvas = $id(canvasId);
+      this.ctx = this.canvas.getContext('2d');
+    }
+    pie.prototype = {
+        paint: function (options) {
+            if (!options) options = {};
+            if (!options.startAngle) options.startAngle = Math.PI * 1.5;
+            var data = options.data;
+            var sum = 0;
+            data.each(function (val) {
+                sum += val.value;
+            });
+            if (sum == 0) {
+                (options.noDataFunction || function () { alert('无数据'); })();
+                return;
+            }
+            data.each(function (val) {
+                val.percent = (val.value / sum);
+            });
+
+            //半径
+            var radius = options.radius || Math.min(this.canvas.width / 2, this.canvas.height / 2);
+            this.radius = radius;
+            var temp = Math.min(this.canvas.width / 2, this.canvas.height / 2);
+            var center = options.center || { x: temp, y: temp };
+            this.center = center; this.radium = radius;
+            //开始画扇形
+            var startAngle = options.startAngle;
+            this.startAngle = startAngle;
+            var painter = this;
+
+            var ctx = this.ctx;
+            data.each(function (item) {
+                var angle = item.percent * Math.PI * 2;
+                if (startAngle > Math.PI * 2) startAngle -= Math.PI * 2;
+                var endAngle = startAngle + angle;
+                if (endAngle > Math.PI * 2) endAngle -= Math.PI * 2;
+                ctx.fillStyle = item.color || painter.getRandomColor(item.name);
+                ctx.beginPath();
+                ctx.moveTo(center.x, center.y);
+                ctx.arc(center.x, center.y, radius, startAngle, endAngle, false);
+                ctx.closePath();
+                ctx.fill();
+                item.range = { start: startAngle, end: endAngle };
+                startAngle = endAngle;
+            });
+            this.data = data;
+            this.canvas.painter = this;
+            addEvent(this.canvas, 'click', this._click);
+            addEvent(this.canvas, 'mouseover', this._mouseOver);
+            addEvent(this.canvas, 'mousemove', this._mouseMove);
+            addEvent(this.canvas, 'mouseout', this._mouseOut);
+        },
+        _getTargetPartRelatedData: function (painter, ev) {
+            //转换成相对于圆心的坐标
+            var center = painter.center;
+            var offset = { x: ev.offsetX - center.x, y: ev.offsetY - center.y };
+            var angle = Math.atan2(offset.y, offset.x);
+            if (angle < 0) angle = Math.PI * 2 + angle;
+            var pointToCenter = offset.y / Math.sin(angle);
+            if (Math.abs(pointToCenter) > painter.radium) {
+                setDebugMsg('不在圆形范围内' + offset.x + ',' + offset.y, false);
+                return null;
+            }
+            setDebugMsg('在圆内，开始计算扇形区域' + offset.x + ',' + offset.y);
+            var mousePointData = null;
+            painter.data.each(function (item, arr) {
+                var range = item.range;
+                if (range.start <= range.end) {
+                    if (range.start <= angle && range.end >= angle) {
+                        arr.breakLoop = true;
+                        mousePointData = item;
+                    }
+                } else {
+                    var ranges = [{ start: range.start, end: Math.PI * 2 }, { start: 0, end: range.end}];
+                    ranges.each(
+                        function (r, rs) {
+                            if (r.start <= angle && r.end >= angle) {
+                                rs.breakLoop = true;
+                                mousePointData = item;
+                                arr.breakLoop = true;
+                            }
+                        }
+                    );
+                }
+            });
+
+            if (mousePointData) {
+                setDebugMsg('mouse point to:' + mousePointData.name);
+            } else {
+                setDebugMsg('mouse point to: null');
+            }
+            return mousePointData;
+        },
+        _mouseOver: function (ev) { },
+        _mouseMove: function (ev) {
+            ev = ev || event;
+            getOffset(ev);
+            var target = getEventTarget(ev);
+            var painter = target.painter;
+            var data = painter._getTargetPartRelatedData(painter, ev);
+        },
+        _mouseOut: function (ev) { },
+        _click: function (ev) {
+            ev = ev || event;
+            getOffset(ev);
+            var target = getEventTarget(ev);
+            var painter = target.painter;
+            var data = painter._getTargetPartRelatedData(painter, ev);
+            setDebugMsg('you click ' + data.name);
+            painter.clickedData = data;
+            var moveStep = painter.moveStep || 1;
+            painter.pieOffset = 0;
+            var startAngle = painter.startAngle;
+            var maxOffset = painter.radius / 10;
+            var radius = painter.radius;
+            painter.intervalHandler = setInterval(function () {
+                if (painter.pieOffset > maxOffset) {
+                    clearInterval(painter.intervalHandler);
+                    return;
+                }
+                painter.ctx.clearRect(0, 0, painter.canvas.width, painter.canvas.height);
+                painter.randomColorMaxIndex = false;
+                painter.usedColor = [];
+                painter.pieOffset += moveStep;
+                var ctx = painter.ctx;
+                painter.data.each(function (item) {
+                    var angle = item.percent * Math.PI * 2;
+                    if (startAngle > Math.PI * 2) startAngle -= Math.PI * 2;
+                    var endAngle = startAngle + angle;
+                    if (endAngle > Math.PI * 2) endAngle -= Math.PI * 2;
+                    ctx.fillStyle = item.color || painter.getRandomColor(item.name);
+                    ctx.beginPath();
+                    var tempCenter = { x: painter.center.x, y: painter.center.y };
+
+                    if (painter.clickedData && item == painter.clickedData) {
+                        var middleAngle = startAngle <= endAngle ? (startAngle + endAngle) / 2 : (startAngle + endAngle + Math.PI * 2) / 2;
+                        tempCenter.x = tempCenter.x + painter.pieOffset * Math.cos(middleAngle);
+                        tempCenter.y = tempCenter.y + painter.pieOffset * Math.sin(middleAngle);
+                    }
+
+                    ctx.moveTo(tempCenter.x, tempCenter.y);
+                    ctx.arc(tempCenter.x, tempCenter.y, radius, startAngle, endAngle, false);
+                    ctx.closePath();
+                    ctx.fill();
+                    item.range = { start: startAngle, end: endAngle };
+                    startAngle = endAngle;
+                });
+
+            }, 50);
+        },
+        getRandomColor: function (name) {
+            var fullName = this.canvasId + '$' + name;
+            //var storageColor = localStorage.getItem(fullName);
+            //if(storageColor) return storageColor;
+            var colors = this.colors || defaultColors;
+            if (!this.usedColor) this.usedColor = [];
+            var exists;
+            var tempColor = 'Red';
+            var painter = this;
+            var tempIndex = painter.randomColorMaxIndex || 0;
+            do {
+                tempColor = colors[tempIndex];
+                if (colors.length == painter.usedColor.length) break;
+                painter.usedColor.each(function (c, arr) { exists = (c == tempColor); if (exists) arr.breakLoop = true; });
+                tempIndex++;
+            } while (exists);
+            painter.randomColorMaxIndex = tempIndex;
+            //localStorage.setItem(fullName,tempColor);
+            painter.usedColor.push(tempColor);
+            return tempColor;
+        }
+    };
+    
+    var defaultColors = [/*红色*/'#FF0000',
+/*绿色*/'#00FF00',
+/*蓝色*/'#0000FF',
+/*牡丹红*/'#FF00FF',
+/*青色*/'#00FFFF',
+/*黄色*/'#FFFF00',
+/*黑色*/'#000000',
+/*海蓝*/'#70DB93',
+/*巧克力色*/'#5C3317',
+/*蓝紫色*/'#9F5F9F',
+/*黄铜色*/'#B5A642',
+/*亮金色*/'#D9D919',
+/*棕色*/'#A67D3D',
+/*青铜色*/'#8C7853',
+/*士官服蓝色*/'#5F9F9F',
+/*铜色*/'#B87333',
+/*珊瑚红*/'#FF7F00',
+/*紫蓝色*/'#42426F',
+/*深棕*/'#5C4033',
+/*深绿*/'#2F4F2F',
+/*深铜绿色*/'#4A766E',
+/*深橄榄绿*/'#4F4F2F',
+/*深兰花色*/'#9932CD',
+/*深紫色*/'#871F78',
+/*深石板蓝*/'#6B238E',
+/*深铅灰色*/'#2F4F4F',
+/*深棕褐色*/'#97694F',
+/*深绿松石色*/'#7093DB',
+/*暗木色*/'#855E42',
+/*淡灰色*/'#545454',
+/*土灰玫瑰红色*/'#545454',
+/*长石色*/'#D19275',
+/*火砖色*/'#8E2323',
+/*森林绿*/'#238E23',
+/*金色*/'#CD7F32',
+/*鲜黄色*/'#DBDB70',
+/*灰色*/'#C0C0C0',
+/*铜绿色*/'#527F76',
+/*青黄色*/'#93DB70',
+/*猎人绿*/'#215E21',
+/*印度红*/'#4E2F2F',
+/*土黄色*/'#9F9F5F',
+/*浅蓝色*/'#C0D9D9',
+/*浅灰色*/'#A8A8A8',
+/*浅钢蓝色*/'#8F8FBD',
+/*浅木色*/'#E9C2A6',
+/*石灰绿色*/'#32CD32',
+/*桔黄色*/'#E47833',
+/*褐红色*/'#8E236B',
+/*中海蓝色*/'#32CD99',
+/*中蓝色*/'#3232CD',
+/*中森林绿*/'#6B8E23',
+/*中鲜黄色*/'#EAEAAE',
+/*中兰花色*/'#9370DB',
+/*中海绿色*/'#426F42',
+/*中石板蓝色*/'#7F00FF',
+/*中春绿色*/'#7FFF00',
+/*中绿松石色*/'#70DBDB',
+/*中紫红色*/'#DB7093',
+/*中木色*/'#A68064',
+/*深藏青色*/'#2F2F4F',
+/*海军蓝*/'#23238E',
+/*霓虹篮*/'#4D4DFF',
+/*霓虹粉红*/'#FF6EC7',
+/*新深藏青色*/'#00009C',
+/*新棕褐色*/'#EBC79E',
+/*暗金黄色*/'#CFB53B',
+/*橙色*/'#FF7F00',
+/*橙红色*/'#FF2400',
+/*淡紫色*/'#DB70DB',
+/*浅绿色*/'#8FBC8F',
+/*粉红色*/'#BC8F8F',
+/*李子色*/'#EAADEA',
+/*石英色*/'#D9D9F3',
+/*艳蓝色*/'#5959AB',
+/*鲑鱼色*/'#6F4242',
+/*猩红色*/'#BC1717',
+/*海绿色*/'#238E68',
+/*半甜巧克力色*/'#6B4226',
+/*赭色*/'#8E6B23',
+/*银色*/'#E6E8FA',
+/*天蓝*/'#3299CC',
+/*石板蓝*/'#007FFF',
+/*艳粉红色*/'#FF1CAE',
+/*春绿色*/'#00FF7F',
+/*钢蓝色*/'#236B8E',
+/*亮天蓝色*/'#38B0DE',
+/*棕褐色*/'#DB9370',
+/*紫红色*/'#D8BFD8',
+/*石板蓝色*/'#ADEAEA',
+/*浓深棕色*/'#5C4033',
+/*淡浅灰色*/'#CDCDCD',
+/*紫罗兰色*/'#4F2F4F',
+/*紫罗兰红色*/'#CC3299',
+/*麦黄色*/'#D8D8BF',
+/*黄绿色*/'#99CC32'];
+    
+    addLoadEvent(function(){
+      var s = new pie('canvasSector');
+      s.paint({radius:80,data:getSectorData()});
+  });
+
+  function setDebugMsg(msg) {
+      $id('debug').innerHTML = msg;
+  }
+    </script>
+  </head>
+  
+  <body>
+  
+    <canvas id="canvasSector" width="200" height="200" style="background:#f0f0f0;border:1px solid #eee;">
+    您的浏览器不支持哟
+    </canvas>
+  
+    <div id="debug"></div>
+    <style>
+    pre{padding: 60px 0 0 30px;color: gray;font-size: .8em;line-height: 20px;}
+    </style>
+    <p><a href="./index.html">返回列表页</a></p>
+    <pre>
+Author:yukaizhao http://www.cnblogs.com/yukaizhao/ http://weibo.com/yukaizhao/
+参与项目或技术交流：<a href="mailto:yukaizhao@gmail.com">yukaizhao@gmail.com</a>
+    </pre>
+  </body>
+  
+</html>

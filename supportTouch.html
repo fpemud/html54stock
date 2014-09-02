@@ -1,0 +1,95 @@
+﻿<!doctype html />
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html;charset=GBK" />
+<title>test touch</title></head>
+
+<body>
+
+<h1>test touch</h1>
+
+<p>
+<script type="text/javascript">
+    var agent = navigator.userAgent.toLowerCase();
+    var scrWidth = screen.width;
+    var scrHeight = screen.height;
+    // The document.documentElement dimensions seem to be identical to
+    // the screen dimensions on all the mobile browsers I've tested so far
+    var elemWidth = document.documentElement.clientWidth;
+    var elemHeight = document.documentElement.clientHeight;
+    // We need to eliminate Symbian, Series 60, Windows Mobile and Blackberry
+    // browsers for this quick and dirty check. This can be done with the user agent.
+    var otherBrowser = (agent.indexOf("series60") != -1) || (agent.indexOf("symbian") != -1) || (agent.indexOf("windows ce") != -1) || (agent.indexOf("blackberry") != -1);
+    // If the screen orientation is defined we are in a modern mobile OS
+    var mobileOS = typeof orientation != 'undefined' ? true : false;
+    // If touch events are defined we are in a modern touch screen OS
+    var touchOS = ('ontouchstart' in document.documentElement) ? true : false;
+    // iPhone and iPad can be reliably identified with the navigator.platform
+    // string, which is currently only available on these devices.
+    var iOS = (navigator.platform.indexOf("iPhone") != -1) ||
+        (navigator.platform.indexOf("iPad") != -1) ? true : false;
+    // If the user agent string contains "android" then it's Android. If it
+    // doesn't but it's not another browser, not an iOS device and we're in
+    // a mobile and touch OS then we can be 99% certain that it's Android.
+    var android = (agent.indexOf("android") != -1) || (!iOS && !otherBrowser && touchOS && mobileOS) ? true : false;
+
+    document.write("<p><b>Screen width:</b> " + scrWidth + "px<br />" +
+                                "<b>Screen height:</b> " + scrHeight + "px<br />" +
+                                "<b>Document element width:</b> " + elemWidth + "px<br />" +
+                                "<b>Document element height:</b> " + elemHeight + "px<br />" +
+                                "<b>iOS device:</b> " + iOS + "<br />" +
+                                "<b>Mobile OS:</b> " + mobileOS + "<br />" +
+                                "<b>Touch OS:</b> " + touchOS + "<br />" +
+                                "<b>Android device:</b> " + android + "</p>" +
+                                "<p><b>User agent string:</b> " + navigator.userAgent + "</p>" +
+                                "<p><b>platform string:</b> " + navigator.platform + "</p>"
+                                );
+</script>
+</p>
+
+<p>
+('ontouchstart' in window) is 
+<script type="text/javascript">
+document.writeln(('ontouchstart' in window));
+</script>
+</p>
+
+<script type="text/javascript">
+    function testTouchWithCreateEvent() {
+        try {
+            document.createEvent("TouchEvent");
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+</script>
+
+
+<p>
+testTouchWithCreateEvent is 
+<script type="text/javascript">document.writeln(testTouchWithCreateEvent())</script>
+</p>
+
+<p style="text-decoration:line-through;color:Red">
+'createTouch' in document is 
+<script type="text/javascript">
+    document.writeln((typeof TouchEvent != "undefined"));
+</script>
+不可用，在windows下用chrom浏览器也会返回true
+;IE9返回false
+;firefox返回false
+；opera返回false
+</p>
+
+<p>
+(typeof Touch == "object") is 
+<script type="text/javascript">
+    document.writeln(typeof Touch == "object");
+</script>
+
+
+</p>
+
+</body>
+</html>

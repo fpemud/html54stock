@@ -1,0 +1,281 @@
+<!doctype html >
+<html>
+    <head>
+        <meta http-equiv="content-type" content="text/html;charset=GBK" />
+        <title>资金流向盘中分价统计图</title>
+    <script src="libs/util.js" type="text/javascript" charset="GBK"></script>
+    <script src="libs/crossLines.js" type="text/javascript" charset="GBK"></script>
+    <script src="libs/tip.js" type="text/javascript" charset="GBK"></script>
+    <script src="libs/loading.compressed.js" type="text/javascript"></script>
+    <script src="libs/ajax.js" type="text/javascript"></script>
+    <script src="libs/chartEventHelper.js" type="text/javascript"></script>
+    </head>
+    <body>
+    <canvas id="canvas" width="400" height="500" style="border:1px solid #69c"></canvas>
+    <div id="debug"></div>
+    <script type="text/javascript">
+/*
+html5行情图库
+author:yukaizhao
+blog:http://www.cnblogs.com/yukaizhao/ http://weibo.com/yukaizhao/
+参与项目或技术交流：yukaizhao@gmail.com
+*/
+        //http://vol.stock.hexun.com/charts/now/share/PriceAmount.ashx?code=600036
+        //http://vol.stock.hexun.com/Now/share/PriceAmount.shtml?rank=3&code=600036
+        /*
+        * canvasId: canvasId
+        * options:{
+            titleOptions:{position:{x:1,y:1},fontColor:'black',font:'12px Bold Arial'},
+            priceUnitOptions:{position:{x:20,y:15},fontColor:'black',font:'11px Arial',text:'(元)'},
+            flowInInstructionOptions :{position:{x:60,y:30},color:'red',text:'流入性资金',font:'11px Arial',fontColor:'black'},
+            flowOutInstructionOptions:{position:{x:120,y:30},color:'red',text:'流出性资金',font:'11px Arial',fontColor:'black'},
+            chartOptions:{position:{x:50,y:50},width:300,itemHeight:18,borderColor:'gray',lineColor:'gray',minHeight:200},
+            //成交单位选项
+            dealUnitOptions:{color:'red',font:'11px Arial',fontColor:'black',height:20}
+        }
+        * data : {title:'招商银行(600036)日成交分析',unit:'万元',items:[{priceRanges:{begin:11.95,to:11.96},flowIn:354.23,flowOut:18.64}]};
+        *
+        */
+        function moneyFlowAnalysisPainter(canvasId, options, data) {
+            this.canvas = document.getElementById(canvasId);
+            if (!this.canvas.getContext) return;
+            var canvas = this.canvas;
+            var ctx = this.canvas.getContext('2d');
+            var chartOptions = options.chartOptions;
+            var dealUnitOptions = options.dealUnitOptions;
+            var dataLength = data.items.length;
+            chartOptions.height = Math.max(chartOptions.minHeight,dataLength * chartOptions.itemHeight);
+            var canvasHeight = chartOptions.height + chartOptions.position.x + dealUnitOptions.height;
+            canvas.height = canvasHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            function drawText(ops) {
+                ctx.fillStyle = ops.fontColor;
+                ctx.font = ops.font;
+                if (ops.textBaseline) ctx.textBaseline = ops.textBaseline;
+                ctx.fillText(ops.text, ops.position.x, ops.position.y);
+            }
+
+            //画标题
+            if (options.titleOptions) {
+                var to = options.titleOptions;
+                to.text = data.title;
+                drawText(to);
+            }
+
+            //画价格单位
+            //priceUnitOptions:{position:{x:20,y:15},fontColor:'black',font:'11px Arial',text:'(元)'},
+            if (options.priceUnitOptions) {
+                drawText(options.priceUnitOptions);
+            }
+            /*
+            flowInInstructionOptions :{position:{x:60,y:30},color:'red',text:'流入性资金',font:'11px Arial',fontColor:'black'},
+            flowOutInstructionOptions:{position:{x:120,y:30},color:'red',text:'流出性资金',font:'11px Arial',fontColor:'black'},
+            */
+            if (options.flowInInstructionOptions) {
+                var op = options.flowInInstructionOptions;
+                ctx.beginPath();
+                ctx.rect(op.position.x,op.position.y,op.rectSize,op.rectSize);
+                ctx.fillStyle = op.color;
+                ctx.strokeStyle = op.strokeStyle || 'lightGray';
+                ctx.fill();
+                ctx.stroke();                
+                op.position = { x: op.position.x+op.fontOffset.left + op.rectSize, y: op.position.y+op.fontOffset.top };
+                drawText(op);
+            }
+            if (options.flowOutInstructionOptions) {
+                var op = options.flowOutInstructionOptions;
+                ctx.beginPath();
+                ctx.rect(op.position.x, op.position.y, op.rectSize, op.rectSize);
+                ctx.fillStyle = op.color;
+                ctx.strokeStyle = op.strokeStyle || 'lightGray';
+                ctx.fill();
+                ctx.stroke();
+                op.position = { x: op.position.x + op.fontOffset.left + op.rectSize, y: op.position.y + op.fontOffset.top };
+                drawText(op);
+            }
+            //画主图区
+            ctx.beginPath();
+            ctx.lineWidth = 1;
+            ctx.rect(chartOptions.position.x, chartOptions.position.y,chartOptions.width,chartOptions.height);
+            ctx.strokeStyle = chartOptions.borderColor;
+            ctx.closePath();
+            ctx.stroke();
+
+            //画线
+            ctx.lineWidth = 1;
+            var lineCount = chartOptions.height / (chartOptions.itemHeight*2);
+            for (var i=1;i<lineCount ;i++) {
+                ctx.beginPath();
+                ctx.fillStyle = chartOptions.borderColor;
+                var x = chartOptions.position.x;
+                var y = chartOptions.position.y + i * chartOptions.itemHeight*2;
+                ctx.rect(x, y, chartOptions.width, 1);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            var verticalLines = [chartOptions.width / 4, chartOptions.width / 2, chartOptions.width / 4 * 3];
+            for (var i = 0; i < verticalLines.length; i++) {
+                ctx.beginPath();
+                ctx.fillStyle = chartOptions.borderColor;
+                ctx.rect(chartOptions.position.x + verticalLines[i], chartOptions.position.y, 1, chartOptions.height);
+                ctx.closePath();
+                ctx.fill();
+            }
+            //画线完毕
+
+            var items = data.items;
+            var max = 0;
+            for (var i = 0; i < items.length; i++) {
+                max = Math.max(max, items[i].flowIn);
+                max = Math.max(max, items[i].flowOut);
+            }
+
+            var flowInColor = options.flowInInstructionOptions.color;
+            var flowOutColor = options.flowOutInstructionOptions.color;
+
+            //底部成交额坐标
+            var txt = '0.00';
+            var top = chartOptions.height + chartOptions.position.y + 2;
+            ctx.fillStyle = 'black';
+            var txtWidth = ctx.measureText(txt).width;
+            ctx.fillText(txt,chartOptions.width / 2 + chartOptions.position.x - txtWidth / 2, top);
+
+            txt = max.toFixed(2);
+            txtWidth = ctx.measureText(txt).width;
+            ctx.fillStyle = 'red';
+            ctx.fillText(txt, chartOptions.width + chartOptions.position.x - txtWidth, top);
+
+            txt = (max / 2).toFixed(2);
+            txtWidth = ctx.measureText(txt).width;
+            ctx.fillText(txt, chartOptions.width * 3/4 + chartOptions.position.x - txtWidth/2, top);
+
+            txt = '-' + max.toFixed(2);
+            ctx.fillStyle = 'green';
+            ctx.fillText(txt, chartOptions.position.x, top);
+
+            txt = '-' + (max / 2).toFixed(2);
+            txtWidth = ctx.measureText(txt).width;
+            ctx.fillText(txt, chartOptions.position.x + chartOptions.width / 4 - txtWidth /2, top);
+            function getY(index) { return chartOptions.position.y + (index * 2 + 1) * chartOptions.barSpace / 2 + index * chartOptions.barHeight; }
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var inLength = chartOptions.width / 2 * item.flowIn / max;
+                var outLength = chartOptions.width / 2 * item.flowOut / max;
+                var y = getY(i);
+
+                //资金流出
+                ctx.fillStyle = flowInColor;
+                ctx.beginPath();
+                ctx.rect(chartOptions.position.x + chartOptions.width / 2, y, inLength, chartOptions.barHeight);
+                ctx.closePath();
+                ctx.fill();
+
+                //资金流入
+                ctx.fillStyle = flowOutColor ;
+                ctx.beginPath();
+                ctx.rect(chartOptions.position.x + chartOptions.width / 2 - outLength, y, outLength, chartOptions.barHeight);
+                ctx.closePath();
+                ctx.fill();
+
+                if (i % 2 == 0) {
+                    //左侧价格
+                    var price = new Number(item.priceRanges.to).toFixed(2);
+                    ctx.font = chartOptions.priceScalerTextFont;
+                    var priceWidth = ctx.measureText(price).width;
+                    var x = chartOptions.position.x - priceWidth + chartOptions.priceScalerOffset.right;
+                    y = chartOptions.position.y + chartOptions.itemHeight *  (i+1) - chartOptions.priceScalerFontHeight / 2 + chartOptions.priceScalerOffset.top;
+                    ctx.fillStyle = chartOptions.priceScalerColor;
+                    ctx.textBaseline = chartOptions.priceScalerTextBaseline;
+                    ctx.fillText(price, x, y);
+                }
+            }
+
+            function getIndexByY(pointY) {
+                var index = Math.ceil((pointY - chartOptions.position.y) / (chartOptions.barSpace + chartOptions.barHeight)) - 1;
+                if (index >= items.length) return items.length - 1;
+                return index;
+            }
+            addCrossLinesAndTipEvents(canvas, {
+                getCrossPoint: function (ev) {
+                    var dataIndex = getIndexByY(ev.offsetY);
+                    var y = getY(dataIndex) + chartOptions.barHeight / 2;
+                    return { x: ev.offsetX, y: y };
+                },
+                triggerEventRanges: { x: chartOptions.position.x, y: chartOptions.position.y, width: chartOptions.width, height: chartOptions.height },
+                tipOptions: {
+                    getTipHtml: function (ev) {
+                        var dataIndex = getIndexByY(ev.offsetY);
+                        if (dataIndex >= 0 && dataIndex < items.length) {
+                            var dataItem = items[dataIndex]
+
+                            var flowInGreatThanOut = Math.abs(dataItem.flowIn) > Math.abs(dataItem.flowOut);
+                            return '价格区间：' + dataItem.priceRanges.begin + ' - ' + dataItem.priceRanges.to + '(元)'
+                                + '<br/>流入资金：<font color="' + flowInColor + '">' + dataItem.flowIn + '(' + data.unit + ')</font>'
+                                + '<br/>流出资金：<font color="' + flowOutColor + '">' + dataItem.flowOut + '(' + data.unit + ')</font>'
+                                + '<br/>差　　值：<font color="' + (flowInGreatThanOut ? flowInColor : flowOutColor) + '">'
+                                + (Math.abs(dataItem.flowIn) - Math.abs(dataItem.flowOut)).toFixed(2)
+                                + '</font>';
+                        }
+                    },
+                    position: { x: chartOptions.position.x + chartOptions.width/6, y: false }, //position中的值是相对于canvas的左上角的
+                    size: { width: 165, height: 100 },
+                    opacity: 80,
+                    cssClass: null,
+                    offsetToPoint: 30
+                },
+                crossLineOptions: {
+                    color: 'red'
+                }
+            });
+        }
+
+        //载入数据调用Painter画图
+        Ajax.get('dailyTradeAnalysis.xml',
+            function (client) {
+                if (client.readyState == 4 && (client.status == 200 || client.status == 304)) {
+                    var dom = client.responseXML;
+                    var titleNode = dom.getElementsByTagName('Data')[0].getElementsByTagName('Title')[0];
+                    var title = titleNode.getAttribute('name');
+                    var itemRootNode = dom.getElementsByTagName('Item')[0];
+                    var itemTitleNode = itemRootNode.getElementsByTagName('Title')[0];
+                    var unit = itemTitleNode.getAttribute('unit');
+                    var itemNodes = itemRootNode.getElementsByTagName('Item');
+                    var items = [];
+                    for (var i = 0; i < itemNodes.length; i++) {
+                        var itemNode = itemNodes[i];
+                        var item = { priceRanges: { begin: itemNode.getAttribute('price1'), to: itemNode.getAttribute('price2') },
+                            flowIn: itemNode.getAttribute('inflow'), flowOut: itemNode.getAttribute('outflow')
+                        };
+                        items.push(item);
+                    }
+                    var painter = new moneyFlowAnalysisPainter('canvas',
+                        {
+                            titleOptions: { position: { x: 10, y: 20 }, fontColor: 'black', font: 'Bold 12px Arial' },
+                            priceUnitOptions: { position: { x: 24, y: 38 }, fontColor: 'black', font: '11px Arial', text: '(元)' },
+                            flowInInstructionOptions: { position: { x: 180, y: 33 }, color: 'red', text: '流入性资金', font: '11px Arial', fontColor: 'black', rectSize: 12, textBaseline: 'top', fontOffset: {left:2,top:-2} },
+                            flowOutInstructionOptions: { position: { x: 280, y: 33 }, color: 'green', text: '流出性资金', font: '11px Arial', fontColor: 'black', rectSize: 12, textBaseline: 'top', fontOffset: { left: 2, top: -2} },
+                            chartOptions: { position: { x: 50, y: 50 }, width: 330, itemHeight: 9, barHeight: 5, barSpace: 4, borderColor: 'gray', lineColor: 'gray', minHeight: 200,
+                                priceScalerTextFont: '11px Arial', priceScalerFontHeight: 11, priceScalerColor: 'black', priceScalerOffset: { right: -4, top: 2 }, priceScalerTextBaseline: 'alphabetic'
+                            },
+                            //成交单位选项
+                            dealUnitOptions: { color: 'red', font: '11px Arial', fontColor: 'black', height: 30 }
+                        },
+                        { title: title, unit: unit, items: items }
+                    );
+
+                }
+            },'canvas');
+    </script>
+
+    <style>
+    pre{padding: 60px 0 0 30px;color: gray;font-size: .8em;line-height: 20px;}
+    </style>
+    <p><a href="./index.html">返回列表页</a></p>
+    <pre>
+Author:yukaizhao http://www.cnblogs.com/yukaizhao/ http://weibo.com/yukaizhao/
+参与项目或技术交流：<a href="mailto:yukaizhao@gmail.com">yukaizhao@gmail.com</a>
+    </pre>
+    </body>
+</html>
